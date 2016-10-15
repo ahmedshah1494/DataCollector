@@ -53,6 +53,7 @@ public class CameraModule {
     Surface mSurface = null;
     ImageReader imgR;
     String folder = "";
+    CameraCaptureSession mCaptureSession;
 
     CameraModule(MainActivity context) {
         this.context = context;
@@ -144,7 +145,7 @@ public class CameraModule {
                 CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
         Log.d("Output formats",""+configs.getOutputFormats()[0] + " "+configs.getOutputFormats()[1] + " "+configs.getOutputFormats()[2]);
 
-        Size s = configs.getOutputSizes(ImageFormat.JPEG)[0];
+        Size s = configs.getOutputSizes(ImageFormat.JPEG)[configs.getOutputSizes(ImageFormat.JPEG).length - 1];
         Log.d("Size", s.getWidth()+","+s.getHeight());
         final ImageReader ir = ImageReader.newInstance(s.getWidth(), s.getHeight(), PixelFormat.RGBA_8888, 2);
         ir.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
@@ -162,11 +163,11 @@ public class CameraModule {
                 Bitmap bitmap = Bitmap.createBitmap(ir.getWidth(), ir.getHeight(),Bitmap.Config.ARGB_8888);
                 bitmap.copyPixelsFromBuffer(buffer);
                 image.close();
-                Bitmap bm = Bitmap.createBitmap(bitmap, 0, ir.getHeight() - 500, 900, 500);
+//                Bitmap bm = Bitmap.createBitmap(bitmap, 0, ir.getHeight() - 500, 900, 500);
 
                 try {
                     FileOutputStream fos = new FileOutputStream(createImageFile(""));
-                    bm.compress(Bitmap.CompressFormat.JPEG, 100, fos);
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos);
                     fos.close();
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -212,52 +213,20 @@ public class CameraModule {
         assert mSurface != null;
         assert mSurface.isValid();
         try {
-            CaptureRequest.Builder builder = mCamera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-            builder.addTarget(mSurface);
-            builder.set(CaptureRequest.CONTROL_AE_LOCK, false);
-            builder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON);
-            builder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
-            builder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_AUTO);
-            builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
-            builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, 6);
-
-            final CaptureRequest request = builder.build();
             s.add(mSurface);
             Log.d("Camera Status", "Creating Capture Session...");
             mCamera.createCaptureSession(s, new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(CameraCaptureSession session) {
-                    try {
-                        Log.d("Capture Status","Configuration Successful");
-                        Log.d("AE PRECAPTURE TRIGGER", request.get(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER) + "");
-
-                        session.capture(request, new CameraCaptureSession.CaptureCallback() {
-                            @Override
-                            public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
-
-                                super.onCaptureCompleted(session, request, result);
-                                context.updateStatus("Capture Successful");
-                                Log.d("Capture Result", "Success");
-                                mCamera.close();
-
-                            }
-
-                            @Override
-                            public void onCaptureFailed(CameraCaptureSession session, CaptureRequest request, CaptureFailure failure) {
-                                super.onCaptureFailed(session, request, failure);
-                                Log.d("Capture Result", "Failure");
-                                context.updateStatus("Capture Failed");
-                            }
-                        }, context.handler);
-                    } catch (CameraAccessException e) {
-                        e.printStackTrace();
-                    }
+                    Log.d("Capture Status","Configuration Successful");
+                    mCaptureSession = session;
                 }
 
                 @Override
                 public void onConfigureFailed(CameraCaptureSession session) {
                     Log.d("Capture Status","Configuration Failed");
                     mSurface = null;
+                    mCaptureSession = null;
                 }
             }, context.handler);
         } catch (CameraAccessException e) {
@@ -266,5 +235,49 @@ public class CameraModule {
 
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    public void takePicture(){
+        if (mCaptureSession == null){
+            return;
+        }
+        assert mCaptureSession != null;
 
+        CaptureRequest.Builder builder = null;
+        try {
+            builder = mCamera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+        builder.addTarget(mSurface);
+        builder.set(CaptureRequest.CONTROL_AE_LOCK, false);
+        builder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON);
+        builder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
+        builder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_AUTO);
+        builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+//        builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, 6);
+
+        CaptureRequest request = builder.build();
+        try {
+            mCaptureSession.capture(request, new CameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
+
+                    super.onCaptureCompleted(session, request, result);
+                    context.updateStatus("Capture Successful");
+                    Log.d("Capture Result", "Success");
+//                    mCamera.close();
+
+                }
+
+                @Override
+                public void onCaptureFailed(CameraCaptureSession session, CaptureRequest request, CaptureFailure failure) {
+                    super.onCaptureFailed(session, request, failure);
+                    Log.d("Capture Result", "Failure");
+                    context.updateStatus("Capture Failed");
+                }
+            }, context.handler);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+    }
 }

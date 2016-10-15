@@ -69,6 +69,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     CommunicationsModule comms;
     double amplitude;
     private CameraView mCameraView;
+    CameraModule mCameraModule;
 
     private static final String DATA_COLLECTOR_FOLDER = "DataCollector";
 
@@ -119,6 +120,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
         mActivityMonitor = new ActivityMonitor();
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        mCameraModule = new CameraModule(this);
+        mCameraModule.openCamera();
+        mCameraModule.setFolder(this.DATA_COLLECTOR_FOLDER+"/"+mChosenFile);
         for (int i = 0; i < this.sensors.length; i++) {
             Sensor sensor = mSensorManager.getDefaultSensor(this.sensors[i]);
             mSensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME);
@@ -168,14 +172,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 recordAudio(System.currentTimeMillis()+"", 3.0);
             }
         });
-//        shootB.setOnClickListener(new View.OnClickListener() {
-//            @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-//            @Override
-//            public void onClick(View v) {
-//                takePicture();
-//            }
-//        });
-        shootB.setOnClickListener(mOnClickListener);
+        shootB.setOnClickListener(new View.OnClickListener() {
+            @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+            @Override
+            public void onClick(View v) {
+                mCameraModule.takePicture();
+            }
+        });
+//        shootB.setOnClickListener(mOnClickListener);
         fab.setOnClickListener(new FolderClickListener(this));
 
         handler.post(new Runnable() {
@@ -324,7 +328,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
                 @Override
                 public void run() {
-                    takePicture();
+                    mCameraModule.takePicture();
                     handler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
