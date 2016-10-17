@@ -34,6 +34,7 @@ public class ActivityMonitor{
     private boolean phoneMovedUp = false;
     private boolean phoneMovedDown = false;
     private boolean phoneAtEar = false;
+    private boolean phoneInPocket = false;
 
     ActivityMonitor(){
         sensorData = new HashMap<Integer, ArrayList<float[]>>();
@@ -73,26 +74,38 @@ public class ActivityMonitor{
         }
         if (sensorType == Sensor.TYPE_LINEAR_ACCELERATION){
             int len = sensorData.get(sensorType).size();
-            List<float[]> last = sensorData.get(sensorType).subList(Math.max(0,len - 64), len - 1);
+            List<float[]> last = sensorData.get(sensorType).subList(Math.max(0,len - 10), len - 1);
             boolean monoDec = true;
             boolean monoInc = true;
+            int axis = 2;
+            if (sensorData.get(Sensor.TYPE_GRAVITY).size() > 0){
+                float[] gravity = sensorData.get(Sensor.TYPE_GRAVITY).get(sensorData.get(Sensor.TYPE_GRAVITY).size() - 1);
+                float max = -10.0f;
+                for(int i = 0; i<gravity.length; i++){
+                    if (gravity[i] > max){
+                        max = Math.abs(gravity[i]);
+                        axis = i;
+                    }
+                }
+            }
+//            Log.d("axis", axis+"");
             for (int i = 0; (i < last.size() - 1) && (monoDec || monoInc) ; i++){
-                if (last.get(i)[2] < last.get(i+1)[2]){
+                if (last.get(i)[axis] < last.get(i+1)[axis]){
                     monoDec = false;
                 }
-                if (last.get(i)[2] > last.get(i+1)[2]){
+                if (last.get(i)[axis] > last.get(i+1)[axis]){
                     monoInc = false;
                 }
             }
             if (monoDec){
                 phoneMovedDown = true;
                 phoneMovedUp = false;
-                Log.d("Postion", "phone moved down");
+                Log.d("Postion", "phone moved down on axis " + axis);
             }
             if (monoInc){
                 phoneMovedUp = true;
                 phoneMovedDown = false;
-                Log.d("Postion", "phone moved up");
+                Log.d("Postion", "phone moved up on axis " + axis);
             }
         }
     }
@@ -152,18 +165,28 @@ public class ActivityMonitor{
         if (phoneAtEar){
             map.ear = true;
         }
+        if (phoneInPocket &&
+                sensorData.get(Sensor.TYPE_LIGHT).get(sensorData.get(Sensor.TYPE_LIGHT).size() - 1)[0] > 1){
+            map.pocket = false;
+            phoneInPocket = false;
+        }
+        if (phoneInPocket){
+            map.pocket = true;
+        }
         else if (map.moving &&
                 (!map.flat &&
                         (sensorData.get(Sensor.TYPE_LIGHT).size() > 0 &&
                                 getLatestSensorReading(Sensor.TYPE_LIGHT)[0] <= 2))){
             double gravityMean = getReadingMean(Sensor.TYPE_GRAVITY,2);
+            Log.d("Phone Moved Up", phoneMovedUp + "");
+            Log.d("gravity mean", gravityMean +"");
             if (phoneMovedUp &&
-                    gravityMean < 0.1 &&
+                    gravityMean < 1.0 &&
                     gravityMean > -3.0){
                 map.ear = true;
                 phoneAtEar = true;
             }
-            else {
+            else if (phoneMovedDown){
                 map.pocket = true;
             }
         }

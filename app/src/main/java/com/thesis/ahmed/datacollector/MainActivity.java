@@ -5,16 +5,19 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.support.annotation.RequiresApi;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -32,6 +35,7 @@ import android.widget.Toast;
 import com.google.android.cameraview.CameraView;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.FilenameFilter;
@@ -69,8 +73,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     CommunicationsModule comms;
     double amplitude;
     private CameraView mCameraView;
-    CameraModule mCameraModule;
-
+    public CameraModule mCameraModule;
+    long appStartTime;
     private static final String DATA_COLLECTOR_FOLDER = "DataCollector";
 
     private View.OnClickListener mOnClickListener = new View.OnClickListener() {
@@ -85,6 +89,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        appStartTime = System.currentTimeMillis();
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -176,7 +181,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
             @Override
             public void onClick(View v) {
-                mCameraModule.takePicture();
+                mCameraModule.takePicture(false);
             }
         });
 //        shootB.setOnClickListener(mOnClickListener);
@@ -222,6 +227,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 handler.postDelayed(this, 1000);
             }
         });
+//        handler.post(new Runnable() {
+//            @Override
+//            public void run() {
+//                IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+//                Intent batteryStatus = registerReceiver(null, ifilter);
+//                int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+//                int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+//
+//                float batteryPct = level / (float)scale;
+//                Log.d("Battery Level", batteryPct + "");
+//                long uptime = (System.currentTimeMillis() - appStartTime);
+//                long min = uptime/60000;
+//                long hour = min/60;
+//                Log.d("Application Uptime", hour + ":" + (min % 60));
+//                handler.postDelayed(this, 30*60*1000);
+//            }
+//        });
+
+        File batTestFile = new File( logDirectory, "BatteryTest" + System.currentTimeMillis() + ".txt" );
+        try {
+            handler.post(new BatteryTest(new FileOutputStream(batTestFile)));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
         sendB.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -243,6 +272,35 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 }
             }
         });
+    }
+
+    private class BatteryTest implements Runnable{
+        FileOutputStream os;
+        BatteryTest(FileOutputStream out){
+            os = out;
+        }
+        @Override
+        public void run() {
+            try {
+                os.write((getBatteryLevel()+"").getBytes());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            handler.postDelayed(this, 30*60*1000);
+        }
+
+        private float getBatteryLevel() {
+            Intent batteryIntent = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            int level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+            int scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+
+            // Error checking that probably isn't needed but I added just in case.
+            if(level == -1 || scale == -1) {
+                return 50.0f;
+            }
+
+            return ((float)level / (float)scale) * 100.0f;
+        }
     }
 
     private void recordAudio(final String filename, final double duration){
@@ -322,13 +380,26 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 //    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void doAction(){
+        Log.d("Pocket", position.pocket + "");
+        if (mCameraModule.lastCaptureHistogram != null &&
+                mCameraModule.lastCaptureHistogram.percentageLessThanVal(50) > 90){
+            Log.d("Last Picture", "Dark");
+            pictureDone = true;
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    pictureDone = false;
+                }
+            }, 120000);
+        }
+
         if (!pictureDone && position.hand && !position.moving){
             pictureDone = true;
             mThreadPool.execute(new Runnable() {
                 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
                 @Override
                 public void run() {
-                    mCameraModule.takePicture();
+                    mCameraModule.takePicture(false);
                     handler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
@@ -337,6 +408,23 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     }, 30000);
                 }
             });
+        }
+        if (position.pocket){
+            mCameraModule.takePicture(true);
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (mCameraModule.lastCaptureHistogram != null &&
+                            mCameraModule.lastCaptureHistogram.percentageLessThanVal(50) > 80){
+                        pictureDone = true;
+                        Log.d("Last Picture", "Dark");
+                    }
+                    else{
+                        Log.d("Last Picture", "Not Dark");
+                        position.pocket = false;
+                    }
+                }
+            }, 1000);
         }
 //        recorder.saveRecording = false;
 //        recorder.startRecording();

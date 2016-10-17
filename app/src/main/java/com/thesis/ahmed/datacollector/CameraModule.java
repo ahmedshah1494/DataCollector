@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.PixelFormat;
 import android.hardware.camera2.CameraAccessException;
@@ -54,7 +55,8 @@ public class CameraModule {
     ImageReader imgR;
     String folder = "";
     CameraCaptureSession mCaptureSession;
-
+    boolean testDark;
+    public Histogram lastCaptureHistogram;
     CameraModule(MainActivity context) {
         this.context = context;
         mCameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
@@ -147,31 +149,38 @@ public class CameraModule {
 
         Size s = configs.getOutputSizes(ImageFormat.JPEG)[configs.getOutputSizes(ImageFormat.JPEG).length - 1];
         Log.d("Size", s.getWidth()+","+s.getHeight());
-        final ImageReader ir = ImageReader.newInstance(s.getWidth(), s.getHeight(), PixelFormat.RGBA_8888, 2);
+        final ImageReader ir = ImageReader.newInstance(s.getWidth(), s.getHeight(), ImageFormat.JPEG, 2);
         ir.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
             @Override
             public void onImageAvailable(ImageReader reader) {
-                Log.d("ImgReader Size", ir.getWidth()+","+ir.getHeight());
                 Image image = reader.acquireLatestImage();
+                Log.d("ImgReader Size 1", ir.getWidth()+","+ir.getHeight());
+                Log.d("Image format", image.getFormat()+"");
                 Image.Plane[] planes = image.getPlanes();
                 ByteBuffer buffer = planes[0].getBuffer();
-                int offset = 0;
-                int pixelStride = planes[0].getPixelStride();
-                int rowStride = planes[0].getRowStride();
-                int rowPadding = rowStride - pixelStride * ir.getWidth();
-// create bitmap
-                Bitmap bitmap = Bitmap.createBitmap(ir.getWidth(), ir.getHeight(),Bitmap.Config.ARGB_8888);
-                bitmap.copyPixelsFromBuffer(buffer);
-                image.close();
-//                Bitmap bm = Bitmap.createBitmap(bitmap, 0, ir.getHeight() - 500, 900, 500);
-
-                try {
-                    FileOutputStream fos = new FileOutputStream(createImageFile(""));
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos);
-                    fos.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                };
+                byte[] bytes = new byte[buffer.remaining()];
+                buffer.get(bytes);
+                if (testDark){
+                    Bitmap bmp = BitmapFactory.decodeByteArray(bytes,0,bytes.length);
+                    lastCaptureHistogram = new Histogram(bmp);
+                    Log.d("Histogram", lastCaptureHistogram.percentageLessThanVal(50) + "");
+                }
+                else{
+                    FileOutputStream output = null;
+                    try {
+                        output = new FileOutputStream(createImageFile(""));
+                        output.write(bytes);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } finally {
+                        image.close();
+                        try {
+                            output.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
             }
         }, context.handler);
         imgR = ir;
@@ -236,7 +245,7 @@ public class CameraModule {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    public void takePicture(){
+    public void takePicture(boolean test){
         if (mCaptureSession == null){
             return;
         }
@@ -257,6 +266,7 @@ public class CameraModule {
 //        builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, 6);
 
         CaptureRequest request = builder.build();
+        this.testDark = test;
         try {
             mCaptureSession.capture(request, new CameraCaptureSession.CaptureCallback() {
                 @Override
@@ -266,7 +276,7 @@ public class CameraModule {
                     context.updateStatus("Capture Successful");
                     Log.d("Capture Result", "Success");
 //                    mCamera.close();
-
+                    testDark = false;
                 }
 
                 @Override
@@ -274,10 +284,12 @@ public class CameraModule {
                     super.onCaptureFailed(session, request, failure);
                     Log.d("Capture Result", "Failure");
                     context.updateStatus("Capture Failed");
+                    testDark = false;
                 }
             }, context.handler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
+            testDark = false;
         }
     }
 }
