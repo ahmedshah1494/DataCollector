@@ -14,6 +14,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.Arrays;
@@ -110,6 +111,20 @@ public class CommunicationsModule {
         };
         task.execute();
 
+    }
+    public void UploadFile(String filepath){
+        try {
+            // Set your file path here
+            FileInputStream fstrm = new FileInputStream(filepath);
+
+            // Set your server page url (and the file title/description)
+            HttpFileUpload hfu = new HttpFileUpload("http://10.27.9.25:8000/sherlockserver/uploadSample", "","{\"type\": \"audio\", \"location\": \""+context.mChosenFile+"\"}");
+
+            hfu.Send_Now(fstrm);
+
+        } catch (FileNotFoundException e) {
+            // Error: File not found
+        }
     }
     private void _sendFile_(String filepath){
         FileInputStream fis = null;

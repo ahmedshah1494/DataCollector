@@ -147,7 +147,20 @@ public class CameraModule {
                 CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
         Log.d("Output formats",""+configs.getOutputFormats()[0] + " "+configs.getOutputFormats()[1] + " "+configs.getOutputFormats()[2]);
 
-        Size s = configs.getOutputSizes(ImageFormat.JPEG)[configs.getOutputSizes(ImageFormat.JPEG).length - 1];
+        Size[] sizes = configs.getOutputSizes(ImageFormat.JPEG);
+        int targetSize = 480*640;
+        Log.d("targetSize", "" + targetSize);
+        int currSize = 0;
+        int idx = sizes.length - 1;
+        Size s;
+        while (currSize < targetSize && idx > 0){
+            s = sizes[idx];
+            currSize = s.getHeight() * s.getWidth();
+            Log.d("currSize", ""+currSize);
+            idx -= 1;
+        }
+//        Size s = configs.getOutputSizes(ImageFormat.JPEG)[configs.getOutputSizes(ImageFormat.JPEG).length - 2];
+        s = sizes[idx + 1];
         Log.d("Size", s.getWidth()+","+s.getHeight());
         final ImageReader ir = ImageReader.newInstance(s.getWidth(), s.getHeight(), ImageFormat.JPEG, 2);
         ir.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {

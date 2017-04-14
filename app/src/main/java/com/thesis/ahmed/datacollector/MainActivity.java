@@ -1,11 +1,13 @@
 package com.thesis.ahmed.datacollector;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -76,16 +78,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public CameraModule mCameraModule;
     long appStartTime;
     private static final String DATA_COLLECTOR_FOLDER = "DataCollector";
-
-    private View.OnClickListener mOnClickListener = new View.OnClickListener() {
-        @Override
-        public void onClick(View v) {
-            if (mCameraView != null) {
-                mCameraView.takePicture();
-            }
-
-        }
+    private String[] permissions = {
+            Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.INTERNET,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission.READ_LOGS,
     };
+    int nRecs = 0;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -116,6 +117,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             logDirectory.mkdir();
         }
 
+        ActivityCompat.requestPermissions(this,
+                permissions,
+                permissions.length);
+
+
         // clear the previous logcat and then write the new one to the file
         try {
             Process process = Runtime.getRuntime().exec("logcat -c");
@@ -123,11 +129,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         } catch ( IOException e ) {
             e.printStackTrace();
         }
-        mActivityMonitor = new ActivityMonitor();
+        mActivityMonitor = new ActivityMonitor(this);
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+
         mCameraModule = new CameraModule(this);
         mCameraModule.openCamera();
         mCameraModule.setFolder(this.DATA_COLLECTOR_FOLDER+"/"+mChosenFile);
+
         for (int i = 0; i < this.sensors.length; i++) {
             Sensor sensor = mSensorManager.getDefaultSensor(this.sensors[i]);
             mSensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME);
@@ -174,7 +182,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             @Override
             public void onClick(View v) {
 //                EditText dur = (EditText) findViewById(R.id.duration);
-                recordAudio(System.currentTimeMillis()+"", 3.0);
+                recordAudio(System.currentTimeMillis()+"", 30.0);
             }
         });
         shootB.setOnClickListener(new View.OnClickListener() {
@@ -187,70 +195,75 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //        shootB.setOnClickListener(mOnClickListener);
         fab.setOnClickListener(new FolderClickListener(this));
 
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                mThreadPool.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        position = mActivityMonitor.getPosition();
-                        handler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                positionLabel.setText(position.toString());
-                            }
-                        });
-                        doAction();
-                    }
-                });
-                handler.postDelayed(this, 250);
-            }
-        });
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                if (!is_recording){
-                    is_recording = true;
-                    recorder.saveRecording = false;
-                    recorder.startRecording();
-                    handler.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            is_recording=false;
-                            recorder.stopRecording(true);
-                            recorder.saveRecording = true;
-                            amplitude = recorder.maxAmp;
-                            Log.d("amp", amplitude+"");
-                        }
-                    }, 500);
-                }
-                handler.postDelayed(this, 1000);
-            }
-        });
+//        For benchmarking mic power consumption
+//        ==================================================================
 //        handler.post(new Runnable() {
 //            @Override
 //            public void run() {
-//                IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-//                Intent batteryStatus = registerReceiver(null, ifilter);
-//                int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-//                int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-//
-//                float batteryPct = level / (float)scale;
-//                Log.d("Battery Level", batteryPct + "");
-//                long uptime = (System.currentTimeMillis() - appStartTime);
-//                long min = uptime/60000;
-//                long hour = min/60;
-//                Log.d("Application Uptime", hour + ":" + (min % 60));
-//                handler.postDelayed(this, 30*60*1000);
+//                int len = 6;
+//                if (nRecs < 30/len){
+//                    recordAudio(System.currentTimeMillis()+"", len);
+//                    nRecs += 1;
+//                    handler.postDelayed(this, 500 + len*1000);
+//                }
+//            }
+//        });
+//        ===================================================================
+//        handler.post(new Runnable() {
+//            @Override
+//            public void run() {
+//                mThreadPool.execute(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        position = mActivityMonitor.getPosition();
+//                        handler.post(new Runnable() {
+//                            @Override
+//                            public void run() {
+//                                positionLabel.setText(position.toString());
+//                            }
+//                        });
+//                        doAction();
+//                    }
+//                });
+//                handler.postDelayed(this, 250);
+//            }
+//        });
+//        handler.post(new Runnable() {
+//            @Override
+//            public void run() {
+//                if (!is_recording){
+//                    is_recording = true;
+//                    recorder.saveRecording = false;
+//                    recorder.startRecording();
+//                    handler.postDelayed(new Runnable() {
+//                        @Override
+//                        public void run() {
+//                            is_recording=false;
+//                            recorder.stopRecording(true);
+//                            recorder.saveRecording = true;
+//                            amplitude = recorder.maxAmp;
+//                            Log.d("amp", amplitude+"");
+//                        }
+//                    }, 500);
+//                }
+//                handler.postDelayed(this, 1000);
 //            }
 //        });
 
-        File batTestFile = new File( logDirectory, "BatteryTest" + System.currentTimeMillis() + ".txt" );
-        try {
-            handler.post(new BatteryTest(new FileOutputStream(batTestFile)));
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
+
+//        Using images for determining ambient brightness
+//        handler.post(new Runnable() {
+//            @Override
+//            public void run() {
+//                float[] lightReadings = mActivityMonitor.getLatestSensorReading(Sensor.TYPE_LIGHT);
+//                if (lightReadings != null &&
+//                        lightReadings[0] < 2){
+//                    mCameraModule.takePicture(true);
+//                }
+//                handler.postDelayed(this, 60000);
+//            }
+//        });
+
         sendB.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -348,36 +361,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         return image;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    public boolean takePicture() {
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                statusTV.setText("Status: Capturing Image...");
-            }
-        });
-        CameraModule camera = new CameraModule(this);
-        camera.setFolder(this.DATA_COLLECTOR_FOLDER+"/"+mChosenFile);
-        boolean res = camera.openCamera();
-        Log.d("open camera","" + res);
-        if (res){
-            handler.post(new Runnable() {
-                @Override
-                public void run() {
-                    statusTV.setText("Status: Capture Successful");
-                }
-            });
-        }
-        else{
-            handler.post(new Runnable() {
-                @Override
-                public void run() {
-                    statusTV.setText("Status: Capture Unsuccessful");
-                }
-            });
-        }
-        return res;
-    }
 //    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void doAction(){
         Log.d("Pocket", position.pocket + "");
@@ -390,10 +373,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 public void run() {
                     pictureDone = false;
                 }
-            }, 120000);
+            }, 60000);
         }
 
-        if (!pictureDone && position.hand && !position.moving){
+        if (!pictureDone && !position.flat && ! position.face_down && !position.moving && !position.pocket){
             pictureDone = true;
             mThreadPool.execute(new Runnable() {
                 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
@@ -409,22 +392,21 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 }
             });
         }
-        if (position.pocket){
-            mCameraModule.takePicture(true);
+        float[] lightReadings = mActivityMonitor.getLatestSensorReading(Sensor.TYPE_LIGHT);
+
+        if (position.pocket ||
+                lightReadings != null &&
+                lightReadings[0] < 2 &&
+                mCameraModule.lastCaptureHistogram != null &&
+                mCameraModule.lastCaptureHistogram.percentageLessThanVal(50) > 90){
+            recordingDone = true;
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    if (mCameraModule.lastCaptureHistogram != null &&
-                            mCameraModule.lastCaptureHistogram.percentageLessThanVal(50) > 80){
-                        pictureDone = true;
-                        Log.d("Last Picture", "Dark");
-                    }
-                    else{
-                        Log.d("Last Picture", "Not Dark");
-                        position.pocket = false;
-                    }
+                    recordingDone = false;
                 }
-            }, 1000);
+            }, 60000);
+
         }
 //        recorder.saveRecording = false;
 //        recorder.startRecording();
@@ -547,6 +529,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private void updateFolderData(){
         this.recorder.setFolder(DATA_COLLECTOR_FOLDER+"/"+mChosenFile);
+        this.mCameraModule.setFolder(DATA_COLLECTOR_FOLDER+"/"+mChosenFile);
     }
 
     public void updateStatus(final String s){
