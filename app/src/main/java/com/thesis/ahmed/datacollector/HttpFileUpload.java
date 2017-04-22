@@ -1,7 +1,5 @@
 package com.thesis.ahmed.datacollector;
 
-import android.util.Log;
-
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -9,8 +7,9 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import android.util.Log;
 
-public class HttpFileUpload implements Runnable {
+public class HttpFileUpload implements Runnable{
     URL connectURL;
     String responseString;
     String Title;
@@ -108,7 +107,7 @@ public class HttpFileUpload implements Runnable {
 
             dos.flush();
 
-            Log.e(Tag,"File Sent, Response: "+ String.valueOf(conn.getResponseCode()));
+            Log.e(Tag,"File Sent, Response: "+String.valueOf(conn.getResponseCode()));
 
             InputStream is = conn.getInputStream();
 
@@ -137,3 +136,4 @@ public class HttpFileUpload implements Runnable {
         // TODO Auto-generated method stub
     }
 }
+

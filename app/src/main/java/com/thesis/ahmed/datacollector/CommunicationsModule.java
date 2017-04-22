@@ -29,11 +29,17 @@ public class CommunicationsModule {
     int port;
     int fileUploadCount;
     int fileQueueCount;
+    String queueLocation;
     boolean isUploading = false;
+    boolean useData = false;
     CommunicationsModule(String serverAddr, int port, MainActivity context){
         this.ServerAddr = serverAddr;
         this.context = context;
         this.port = port;
+    }
+
+    public void setQueueLocation(String filepath){
+        this.queueLocation = filepath;
     }
 
     public boolean isConnectedToNetwork(){
@@ -47,43 +53,6 @@ public class CommunicationsModule {
         }
     }
 
-    public String getStatusString(){
-        if (isUploading){
-            return "Uploding "+fileUploadCount+"/"+fileQueueCount;
-        }
-        else{
-            return "Idle";
-        }
-    }
-    private Socket connect(){
-        try {
-            if (isConnectedToNetwork()) {
-                Socket sock = new Socket(ServerAddr,port);
-                return sock;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    private String[] checkFilesOnServer(String[] files){
-//      TODO:   need to implement
-        String s = "##CheckFiles\n\n";
-        for (String file: files){
-            s += file+"\n";
-        }
-        s += "//**//";
-        Socket servSoc = connect();
-        try {
-            DataOutputStream out = new DataOutputStream(servSoc.getOutputStream());
-            out.writeUTF(s);
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
 
     public void sendFiles(String[] files){
         fileUploadCount = 0;
@@ -97,7 +66,7 @@ public class CommunicationsModule {
         AsyncTask task = new AsyncTask() {
             @Override
             protected Object doInBackground(Object... params) {
-                _sendFile_(filepath);
+                UploadFile(filepath);
                 return null;
             }
 
@@ -116,60 +85,15 @@ public class CommunicationsModule {
         try {
             // Set your file path here
             FileInputStream fstrm = new FileInputStream(filepath);
+            String filename = filepath.split("/")[filepath.split("/").length - 1];
 
             // Set your server page url (and the file title/description)
-            HttpFileUpload hfu = new HttpFileUpload("http://10.27.9.25:8000/sherlockserver/uploadSample", "","{\"type\": \"audio\", \"location\": \""+context.mChosenFile+"\"}");
+            HttpFileUpload hfu = new HttpFileUpload("http://10.27.9.25:8000/sherlockserver/uploadSample", filename,"{\"type\": \"audio\", \"location\": \""+context.mChosenFile+"\"}");
 
             hfu.Send_Now(fstrm);
 
         } catch (FileNotFoundException e) {
             // Error: File not found
-        }
-    }
-    private void _sendFile_(String filepath){
-        FileInputStream fis = null;
-        BufferedInputStream bis = null;
-        File file = new File(filepath);
-        long size = file.length();
-        String[] split = filepath.split("/");
-        String filename = split[split.length - 1];
-        String folder = split[split.length - 2];
-        filename = filename.replace("\n","");
-//        String filename = split[split.length - 1];
-        String fileData = "";
-        byte[] buf = new byte[1000];
-        int nRead = 0;
-        int total = 0;
-        try {
-            fis = new FileInputStream(filepath);
-            bis = new BufferedInputStream(fis);
-            DataInputStream dis = new DataInputStream(bis);
-            Socket sock = connect();
-            DataOutputStream dos = new DataOutputStream(sock.getOutputStream());
-            dos.writeUTF(folder.trim());
-            dos.writeUTF("\n");
-            dos.writeUTF(filename.trim());
-            dos.writeUTF("\n");
-            dos.writeUTF(size+"");
-            dos.writeUTF("\r\n\r\n");
-
-            while ((nRead = dis.read(buf)) != -1){
-                dos.write(buf);
-                fileData += String.valueOf(Arrays.copyOfRange(buf, 0, nRead));
-                total += nRead;
-                buf = new byte[1000];
-            }
-            dos.close();
-            dis.close();
-            if (sock.isClosed()){
-                sock = connect();
-            }
-            dis = new DataInputStream(sock.getInputStream());
-            dis.read(buf);
-            sock.close();
-
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 }

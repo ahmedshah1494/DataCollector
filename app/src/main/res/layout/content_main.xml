@@ -43,6 +43,17 @@
             app:facing="back"/>
     </LinearLayout>
 
+    <android.support.design.widget.FloatingActionButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="true"
+        app:fabSize="mini"
+        app:srcCompat="@android:drawable/ic_menu_manage"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginBottom="49dp"
+        android:id="@+id/settingsFAB" />
+
 
     <!--<EditText-->
         <!--android:id="@+id/duration"-->

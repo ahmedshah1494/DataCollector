@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -18,6 +19,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.support.annotation.RequiresApi;
@@ -50,6 +52,15 @@ import java.util.concurrent.TimeUnit;
 
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener, ActivityCompat.OnRequestPermissionsResultCallback{
+    int AUDIO_SAMPLING_RATE = 60000;
+    int AUDIO_AMPLITUDE_SAMPLING_RATE = 1000;
+    int AUDIO_AMPLITUDE_SAMPLE_LENGTH = 500;
+    int AUDIO_SAMPLE_LENGTH = 3000;
+    int IMAGE_SAMPLING_RATE = 120000;
+    int AUDIO_SAMPLING_DELAY = 60000;
+    int IMAGE_SAMPLING_DELAY = 60000;
+    int SENSOR_SAMPLING_RATE = 250;
+
     AudioRecorder recorder;
     boolean is_recording = false;
     Handler handler = new Handler(Looper.getMainLooper());
@@ -69,7 +80,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private static int NUMBER_OF_CORES = Runtime.getRuntime().availableProcessors();
     LinkedBlockingQueue<Runnable> Q;
     String[] mFileList;
-    String mChosenFile;
+    String mChosenFile = "null";
     TextView statusTV;
     TextView roomTV;
     CommunicationsModule comms;
@@ -172,6 +183,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         ll.addView(sendB);
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        FloatingActionButton settingsFab = (FloatingActionButton) findViewById(R.id.settingsFAB);
 //        statusTV = new TextView(this);
 //        statusTV.setMaxLines(1);
 //        statusTV.setMinLines(1);
@@ -182,7 +194,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             @Override
             public void onClick(View v) {
 //                EditText dur = (EditText) findViewById(R.id.duration);
-                recordAudio(System.currentTimeMillis()+"", 30.0);
+                recordAudio(System.currentTimeMillis()+"", 3000);
             }
         });
         shootB.setOnClickListener(new View.OnClickListener() {
@@ -194,6 +206,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         });
 //        shootB.setOnClickListener(mOnClickListener);
         fab.setOnClickListener(new FolderClickListener(this));
+        settingsFab.setOnClickListener(new View.OnClickListener(){
+            @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+            @Override
+            public void onClick(View v) {
+                changeSettings(v);
+            }
+        });
+
 
 //        For benchmarking mic power consumption
 //        ==================================================================
@@ -209,60 +229,46 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //            }
 //        });
 //        ===================================================================
-//        handler.post(new Runnable() {
-//            @Override
-//            public void run() {
-//                mThreadPool.execute(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        position = mActivityMonitor.getPosition();
-//                        handler.post(new Runnable() {
-//                            @Override
-//                            public void run() {
-//                                positionLabel.setText(position.toString());
-//                            }
-//                        });
-//                        doAction();
-//                    }
-//                });
-//                handler.postDelayed(this, 250);
-//            }
-//        });
-//        handler.post(new Runnable() {
-//            @Override
-//            public void run() {
-//                if (!is_recording){
-//                    is_recording = true;
-//                    recorder.saveRecording = false;
-//                    recorder.startRecording();
-//                    handler.postDelayed(new Runnable() {
-//                        @Override
-//                        public void run() {
-//                            is_recording=false;
-//                            recorder.stopRecording(true);
-//                            recorder.saveRecording = true;
-//                            amplitude = recorder.maxAmp;
-//                            Log.d("amp", amplitude+"");
-//                        }
-//                    }, 500);
-//                }
-//                handler.postDelayed(this, 1000);
-//            }
-//        });
-
-
-//        Using images for determining ambient brightness
-//        handler.post(new Runnable() {
-//            @Override
-//            public void run() {
-//                float[] lightReadings = mActivityMonitor.getLatestSensorReading(Sensor.TYPE_LIGHT);
-//                if (lightReadings != null &&
-//                        lightReadings[0] < 2){
-//                    mCameraModule.takePicture(true);
-//                }
-//                handler.postDelayed(this, 60000);
-//            }
-//        });
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                mThreadPool.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        position = mActivityMonitor.getPosition();
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                positionLabel.setText(position.toString());
+                            }
+                        });
+                        doAction();
+                    }
+                });
+                handler.postDelayed(this, SENSOR_SAMPLING_RATE);
+            }
+        });
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (!is_recording){
+                    is_recording = true;
+                    recorder.saveRecording = false;
+                    recorder.startRecording();
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            is_recording=false;
+                            recorder.stopRecording(true);
+                            recorder.saveRecording = true;
+                            amplitude = recorder.maxAmp;
+                            Log.d("amp", amplitude+"");
+                        }
+                    }, AUDIO_AMPLITUDE_SAMPLE_LENGTH);
+                }
+                handler.postDelayed(this, AUDIO_AMPLITUDE_SAMPLING_RATE);
+            }
+        });
 
         sendB.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -287,36 +293,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         });
     }
 
-    private class BatteryTest implements Runnable{
-        FileOutputStream os;
-        BatteryTest(FileOutputStream out){
-            os = out;
-        }
-        @Override
-        public void run() {
-            try {
-                os.write((getBatteryLevel()+"").getBytes());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            handler.postDelayed(this, 30*60*1000);
-        }
-
-        private float getBatteryLevel() {
-            Intent batteryIntent = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-            int level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-            int scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-
-            // Error checking that probably isn't needed but I added just in case.
-            if(level == -1 || scale == -1) {
-                return 50.0f;
-            }
-
-            return ((float)level / (float)scale) * 100.0f;
-        }
+    public void changeSettings(View view){
+        Intent intent = new Intent(this, SettingsActivity.class);
+        startActivity(intent);
     }
 
-    private void recordAudio(final String filename, final double duration){
+    private void recordAudio(final String filename, final int duration){
         if (is_recording){
             handler.postDelayed(new Runnable() {
                 @Override
@@ -338,31 +320,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     Log.d("max amp", recorder.maxAmp + "");
                     is_recording = false;
                 }
-            }, Math.round(duration*1000));
+            }, duration);
         }
-    }
-
-    private File createImageFile(String filename) throws IOException {
-        // Create an image file name
-        String imageFileName = filename + "_";
-        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        if (storageDir != null) {
-            Log.d("storage dir", storageDir.toString());
-            storageDir.mkdirs();
-        }
-        File image = File.createTempFile(
-                imageFileName,  /* prefix */
-                ".jpg",         /* suffix */
-                storageDir      /* directory */
-        );
-
-        // Save a file: path for use with ACTION_VIEW intents
-        mCurrentPhotoPath = "file:" + image.getAbsolutePath();
-        return image;
     }
 
 //    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void doAction(){
+        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+        Boolean syncConnPref = sharedPref.getBoolean("pref_key_useData", false);
+        Log.e("use 3G", syncConnPref+"");
         Log.d("Pocket", position.pocket + "");
         if (mCameraModule.lastCaptureHistogram != null &&
                 mCameraModule.lastCaptureHistogram.percentageLessThanVal(50) > 90){
@@ -373,7 +339,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 public void run() {
                     pictureDone = false;
                 }
-            }, 60000);
+            }, IMAGE_SAMPLING_DELAY);
         }
 
         if (!pictureDone && !position.flat && ! position.face_down && !position.moving && !position.pocket){
@@ -388,7 +354,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         public void run() {
                             pictureDone = false;
                         }
-                    }, 30000);
+                    }, IMAGE_SAMPLING_RATE);
                 }
             });
         }
@@ -397,37 +363,29 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if (position.pocket ||
                 lightReadings != null &&
                 lightReadings[0] < 2 &&
-                mCameraModule.lastCaptureHistogram != null &&
-                mCameraModule.lastCaptureHistogram.percentageLessThanVal(50) > 90){
+                !position.moving){
             recordingDone = true;
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
                     recordingDone = false;
                 }
-            }, 60000);
+            }, AUDIO_SAMPLING_DELAY);
 
         }
-//        recorder.saveRecording = false;
-//        recorder.startRecording();
-//        handler.postDelayed(new Runnable() {
-//            @Override
-//            public void run() {
-//                recorder.stopRecording(true);
-//            }
-//        }, 500);
+
         if (!is_recording && !recordingDone && amplitude > 10000.0){
             handler.post(new Runnable() {
                 @Override
                 public void run() {
-                    recordAudio(System.currentTimeMillis()+"", 3.0);
+                    recordAudio(mChosenFile+"_"+System.currentTimeMillis()+"", AUDIO_SAMPLE_LENGTH);
                     recordingDone = true;
                     handler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
                             recordingDone = false;
                         }
-                    }, 2000);
+                    }, AUDIO_SAMPLING_RATE);
                 }
             });
         }
@@ -438,19 +396,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         mThreadPool.execute(new Runnable() {
             @Override
             public void run() {
-//                int[] readings2 = new int[readings.length];
                 String s = "";
-//        for (int i = 0; i < readings.length; i++){
-//            readings[i] = (Math.round(readings[i]*100/100.0));
-//        }
                 float[] readings = event.values.clone();
                 mActivityMonitor.addSensorReading(event.sensor.getType(), readings);
-                if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION){
-//                    Log.d("readings", readings.toString() + "");
-//                    Log.d("last reading", mActivityMonitor.getLatestSensorReading(event.sensor.getType())[0] + "");
-//                    Log.d("variance", mActivityMonitor.getReadingVariance(event.sensor.getType(), 0) + "");
-//                    Log.d("mean", mActivityMonitor.getReadingMean(event.sensor.getType(), 0) + "");
-                }
 
                 for (int i = 0; i < event.values.length; i++) {
                     s += event.values[i] + "(" + mActivityMonitor.getReadingVariance(event.sensor.getType(), i) + "," + mActivityMonitor.getReadingMean(event.sensor.getType(),i) + ")" + "\n";
@@ -541,47 +489,4 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         });
     }
 
-    private CameraView.Callback mCallback
-            = new CameraView.Callback() {
-
-        @Override
-        public void onCameraOpened(CameraView cameraView) {
-            Log.d("", "onCameraOpened");
-        }
-
-        @Override
-        public void onCameraClosed(CameraView cameraView) {
-            Log.d("", "onCameraClosed");
-        }
-
-        @Override
-        public void onPictureTaken(CameraView cameraView, final byte[] data) {
-            Log.d("", "onPictureTaken " + data.length);
-            handler.post(new Runnable() {
-                @Override
-                public void run() {
-                    // This demo app saves the taken picture to a constant file.
-                    // $ adb pull /sdcard/Android/data/com.google.android.cameraview.demo/files/Pictures/picture.jpg
-                    File file = new File(Environment.getExternalStorageDirectory()+"/"+DATA_COLLECTOR_FOLDER+"/"+mChosenFile+"/picture.jpg");
-                    OutputStream os = null;
-                    try {
-                        os = new FileOutputStream(file);
-                        os.write(data);
-                        os.close();
-                    } catch (IOException e) {
-                        Log.w("", "Cannot write to " + file, e);
-                    } finally {
-                        if (os != null) {
-                            try {
-                                os.close();
-                            } catch (IOException e) {
-                                // Ignore
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-    };
 }

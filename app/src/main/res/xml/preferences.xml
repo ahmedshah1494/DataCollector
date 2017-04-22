@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory
+        android:title="Preferred Connection Type"
+        android:key="pref_key_data_settings">
+    <CheckBoxPreference
+        android:key="pref_key_useData"
+        android:title="Mobile Data"
+        android:dialogTitle="Connection Types"
+        android:defaultValue="false"
+        />
+    </PreferenceCategory>
+</PreferenceScreen>
