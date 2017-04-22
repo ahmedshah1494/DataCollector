@@ -149,7 +149,8 @@ public class AudioRecorder {
         return (file.getAbsolutePath() + "/" + AUDIO_RECORDER_TEMP_FILE);
     }
 
-    public void stopRecording(boolean temp){
+    public String stopRecording(boolean temp){
+        final String filename = getFilename();
         if(null != mRecorder){
             isRecording = false;
 
@@ -162,10 +163,10 @@ public class AudioRecorder {
             recordingThread = null;
         }
         if (!temp){
-            final String filename = getFilename();
             if (saveRecording) copyWaveFile(getTempFilename(), filename);
             deleteTempFile();
         }
+        return filename;
     }
 
     private void deleteTempFile() {

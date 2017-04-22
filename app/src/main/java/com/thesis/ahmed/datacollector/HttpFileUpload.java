@@ -28,12 +28,12 @@ public class HttpFileUpload implements Runnable{
         }
     }
 
-    void Send_Now(FileInputStream fStream){
+    boolean Send_Now(FileInputStream fStream){
         fileInputStream = fStream;
-        Sending();
+        return Sending();
     }
 
-    void Sending(){
+    boolean Sending(){
         String iFileName = Title;
         String lineEnd = "\r\n";
         String twoHyphens = "--";
@@ -108,6 +108,9 @@ public class HttpFileUpload implements Runnable{
             dos.flush();
 
             Log.e(Tag,"File Sent, Response: "+String.valueOf(conn.getResponseCode()));
+            if (conn.getResponseCode() != 200){
+                return false;
+            }
 
             InputStream is = conn.getInputStream();
 
@@ -129,6 +132,7 @@ public class HttpFileUpload implements Runnable{
         {
             Log.e(Tag, "IO error: " + ioe.getMessage(), ioe);
         }
+        return true;
     }
 
     @Override

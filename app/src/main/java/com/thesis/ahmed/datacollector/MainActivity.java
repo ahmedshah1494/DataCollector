@@ -106,7 +106,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         mCameraView = (CameraView) findViewById(R.id.camera);
-        comms = new CommunicationsModule("workhorse.lti.cs.cmu.edu", 9999, this);
         Q = new LinkedBlockingQueue<Runnable>();
         mThreadPool = new ThreadPoolExecutor(NUMBER_OF_CORES,
                                                 NUMBER_OF_CORES,
@@ -117,7 +116,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         File appDirectory = new File( Environment.getExternalStorageDirectory() + "/"+DATA_COLLECTOR_FOLDER );
         File logDirectory = new File( appDirectory + "/log" );
         File logFile = new File( logDirectory, "logcat" + System.currentTimeMillis() + ".txt" );
-
+        File commsDir = new File(appDirectory + "/comms");
         // create app folder
         if ( !appDirectory.exists() ) {
             appDirectory.mkdir();
@@ -127,6 +126,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if ( !logDirectory.exists() ) {
             logDirectory.mkdir();
         }
+        if ( !commsDir.exists() ) {
+            commsDir.mkdir();
+        }
+        comms = new CommunicationsModule("workhorse.lti.cs.cmu.edu", 9999, this);
+        comms.setQueueLocation(commsDir);
 
         ActivityCompat.requestPermissions(this,
                 permissions,
@@ -273,22 +277,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sendB.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (mChosenFile != null){
-                    String filepath = Environment.getExternalStorageDirectory().getPath();
-                    File file = new File(filepath, DATA_COLLECTOR_FOLDER+"/"+mChosenFile);
-                    String[] mFileList = file.list(new FilenameFilter() {
-                        @Override
-                        public boolean accept(File dir, String filename) {
-                            File sel = new File(dir, filename);
-                            return !sel.isDirectory();
-                        }
-                    });
-                    String[] files = new String[mFileList.length];
-                    for(int i = 0; i < mFileList.length; i++){
-                        files[i] = (file.getAbsolutePath() + "/" + mFileList[i]);
-                    }
-                    comms.sendFiles(files);
-                }
+            sendFilesCurrDir();
             }
         });
     }
@@ -297,7 +286,24 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         Intent intent = new Intent(this, SettingsActivity.class);
         startActivity(intent);
     }
-
+    private void sendFilesCurrDir(){
+        if (mChosenFile != null){
+            String filepath = Environment.getExternalStorageDirectory().getPath();
+            File file = new File(filepath, DATA_COLLECTOR_FOLDER+"/"+mChosenFile);
+            String[] mFileList = file.list(new FilenameFilter() {
+                @Override
+                public boolean accept(File dir, String filename) {
+                    File sel = new File(dir, filename);
+                    return !sel.isDirectory();
+                }
+            });
+            String[] files = new String[mFileList.length];
+            for(int i = 0; i < mFileList.length; i++){
+                files[i] = (file.getAbsolutePath() + "/" + mFileList[i]);
+            }
+            comms.sendFiles(files);
+        }
+    }
     private void recordAudio(final String filename, final int duration){
         if (is_recording){
             handler.postDelayed(new Runnable() {
@@ -315,10 +321,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    recorder.stopRecording(false);
+                    String fname = recorder.stopRecording(false);
                     statusTV.setText("Status: Finished Recording");
                     Log.d("max amp", recorder.maxAmp + "");
                     is_recording = false;
+                    comms.enq(fname);
                 }
             }, duration);
         }
@@ -326,10 +333,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 //    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void doAction(){
-        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
-        Boolean syncConnPref = sharedPref.getBoolean("pref_key_useData", false);
-        Log.e("use 3G", syncConnPref+"");
-        Log.d("Pocket", position.pocket + "");
+
         if (mCameraModule.lastCaptureHistogram != null &&
                 mCameraModule.lastCaptureHistogram.percentageLessThanVal(50) > 90){
             Log.d("Last Picture", "Dark");
@@ -389,6 +393,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 }
             });
         }
+
+        comms.sendFiles();
     }
 
     @Override
