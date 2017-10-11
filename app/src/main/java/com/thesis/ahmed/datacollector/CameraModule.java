@@ -181,8 +181,10 @@ public class CameraModule {
                 else{
                     FileOutputStream output = null;
                     try {
-                        output = new FileOutputStream(createImageFile(""));
+                        File imgFile = createImageFile("");
+                        output = new FileOutputStream(imgFile);
                         output.write(bytes);
+                        context.comms.enq(imgFile.getAbsolutePath());
                     } catch (IOException e) {
                         e.printStackTrace();
                     } finally {

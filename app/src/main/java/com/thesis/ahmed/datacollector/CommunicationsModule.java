@@ -87,6 +87,7 @@ public class CommunicationsModule {
         fileUploadCount = 0;
         fileQueueCount = files.length;
         for (String file : files){
+            Log.d("sendFiles", file);
             sendFile(file);
         }
     }
@@ -131,7 +132,8 @@ public class CommunicationsModule {
             String filename = filepath.split("/")[filepath.split("/").length - 1];
 
             // Set your server page url (and the file title/description)
-            HttpFileUpload hfu = new HttpFileUpload("http://10.27.9.25:8000/sherlockserver/uploadSample", filename,"{\"type\": \"audio\", \"location\": \""+context.mChosenFile+"\"}");
+            HttpFileUpload hfu = new HttpFileUpload("" +
+                    "uploadSample", filename,"{\"type\": \"audio\", \"location\": \""+context.mChosenFile+"\"}");
 
             return hfu.Send_Now(fstrm);
 

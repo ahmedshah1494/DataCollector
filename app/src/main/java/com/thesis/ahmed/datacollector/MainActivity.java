@@ -52,11 +52,11 @@ import java.util.concurrent.TimeUnit;
 
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener, ActivityCompat.OnRequestPermissionsResultCallback{
-    int AUDIO_SAMPLING_RATE = 60000;
+    int AUDIO_SAMPLING_RATE = 30000;
     int AUDIO_AMPLITUDE_SAMPLING_RATE = 1000;
     int AUDIO_AMPLITUDE_SAMPLE_LENGTH = 500;
     int AUDIO_SAMPLE_LENGTH = 3000;
-    int IMAGE_SAMPLING_RATE = 120000;
+    int IMAGE_SAMPLING_RATE = 60000;
     int AUDIO_SAMPLING_DELAY = 60000;
     int IMAGE_SAMPLING_DELAY = 60000;
     int SENSOR_SAMPLING_RATE = 250;
