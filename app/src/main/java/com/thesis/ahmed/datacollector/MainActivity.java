@@ -430,6 +430,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private class FolderClickListener implements View.OnClickListener{
         File file = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File selectedFolder;
         Activity a;
         public FolderClickListener(Activity a){
             this.a = a;
@@ -452,6 +453,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         mChosenFile = mFileList[which];
                         roomTV.setText("Room: "+ mChosenFile);
                         updateFolderData();
+                        selectedFolder = new File(file.getPath(),mChosenFile);
+                        String[] filesToBeQed = selectedFolder.list(new FilenameFilter() {
+                            @Override
+                            public boolean accept(File file, String s) {
+                                String ext = s.substring(s.length() - 3);
+                                if (ext == "wav" ||
+                                        ext == "jpg"){
+                                    return true;
+                                }
+                                return false;
+                            }
+                        });
+                        comms.enq(filesToBeQed);
                     }
                 });
             builder.setNeutralButton("Create New Folder", new DialogInterface.OnClickListener() {

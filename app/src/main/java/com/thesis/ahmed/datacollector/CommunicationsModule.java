@@ -53,6 +53,12 @@ public class CommunicationsModule {
         uploadQueue.add(filename);
     }
 
+    public void enq(String[] filenames){
+        for (String file: filenames){
+            enq(file);
+        }
+    }
+
     public boolean isConnectedToNetwork(){
         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
         Boolean useData = sharedPref.getBoolean("pref_key_useData", false);
@@ -72,6 +78,10 @@ public class CommunicationsModule {
     }
 
     public void sendFiles(){
+        Log.d("Q length", uploadQueue.size() + "");
+        if (!isConnectedToNetwork()){
+            return;
+        }
         while (! uploadQueue.isEmpty()){
             Log.d("UploadQ",uploadQueue.peek());
             Log.d("Network",isConnectedToNetwork() + "");
@@ -79,6 +89,9 @@ public class CommunicationsModule {
                 String fname = uploadQueue.poll();
                 sendFile(fname);
                 Log.d("Sending File", fname);
+            }
+            else{
+                return;
             }
         }
     }
@@ -131,13 +144,13 @@ public class CommunicationsModule {
             String filename = filepath.split("/")[filepath.split("/").length - 1];
 
             // Set your server page url (and the file title/description)
-            HttpFileUpload hfu = new HttpFileUpload("http://10.27.9.25:8000/sherlockserver/uploadSample", filename,"{\"type\": \"audio\", \"location\": \""+context.mChosenFile+"\"}");
+            HttpFileUpload hfu = new HttpFileUpload("http://"+this.ServerAddr+":"+this.port+"/sherlockserver/uploadSample", filename,"{\"type\": \"audio\", \"location\": \""+context.mChosenFile+"\"}");
 
             return hfu.Send_Now(fstrm);
 
         } catch (FileNotFoundException e) {
             // Error: File not found
         }
-        return true;
+        return false;
     }
 }
