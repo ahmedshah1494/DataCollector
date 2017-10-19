@@ -38,11 +38,13 @@ public class CommunicationsModule {
     Queue<String> uploadQueue;
     boolean isUploading = false;
     boolean useData = false;
+    boolean QBusy;
     CommunicationsModule(String serverAddr, int port, MainActivity context){
         this.ServerAddr = serverAddr;
         this.context = context;
         this.port = port;
         this.uploadQueue = new ConcurrentLinkedQueue<String>();
+        this.QBusy = false;
     }
 
     public void setQueueLocation(File filepath){
@@ -79,13 +81,14 @@ public class CommunicationsModule {
 
     public void sendFiles(){
         Log.d("Q length", uploadQueue.size() + "");
-        if (!isConnectedToNetwork()){
+        if (!isConnectedToNetwork() && !this.QBusy){
             return;
         }
         while (! uploadQueue.isEmpty()){
             Log.d("UploadQ",uploadQueue.peek());
             Log.d("Network",isConnectedToNetwork() + "");
-            if (isConnectedToNetwork()){
+            Log.d("QBusy", this.QBusy + "");
+            if (isConnectedToNetwork() && !this.QBusy){
                 String fname = uploadQueue.poll();
                 sendFile(fname);
                 Log.d("Sending File", fname);
@@ -108,19 +111,21 @@ public class CommunicationsModule {
         AsyncTask task = new AsyncTask() {
             @Override
             protected Object doInBackground(Object... params) {
+                QBusy = true;
                 if (! UploadFile(filepath)){
                     uploadQueue.add(filepath);
                     return false;
                 }
+                fileUploadCount ++;
+                Log.d("Uploaded", filepath);
+                context.updateStatus("Uploading "+fileUploadCount+"/"+fileQueueCount);
                 return true;
             }
 
             @Override
             protected void onPostExecute(Object o){
-                fileUploadCount ++;
-                Log.d("Uploaded", filepath);
-                context.updateStatus("Uploading "+fileUploadCount+"/"+fileQueueCount
-                );
+                QBusy = false;
+                return;
             }
         };
         AsyncTask T = task.execute();
@@ -150,6 +155,7 @@ public class CommunicationsModule {
 
         } catch (FileNotFoundException e) {
             // Error: File not found
+            e.printStackTrace();
         }
         return false;
     }

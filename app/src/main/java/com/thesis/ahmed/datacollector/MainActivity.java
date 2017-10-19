@@ -89,6 +89,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public CameraModule mCameraModule;
     long appStartTime;
     private static final String DATA_COLLECTOR_FOLDER = "DataCollector";
+    File appDirectory;
     private String[] permissions = {
             Manifest.permission.CAMERA,
             Manifest.permission.RECORD_AUDIO,
@@ -113,7 +114,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                                 TimeUnit.SECONDS,
                                                 Q);
         recorder = new AudioRecorder("DataCollector/");
-        File appDirectory = new File( Environment.getExternalStorageDirectory() + "/"+DATA_COLLECTOR_FOLDER );
+        appDirectory = new File( Environment.getExternalStorageDirectory() + "/"+DATA_COLLECTOR_FOLDER );
         File logDirectory = new File( appDirectory + "/log" );
         File logFile = new File( logDirectory, "logcat" + System.currentTimeMillis() + ".txt" );
         File commsDir = new File(appDirectory + "/comms");
@@ -129,7 +130,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if ( !commsDir.exists() ) {
             commsDir.mkdir();
         }
-        comms = new CommunicationsModule("workhorse.lti.cs.cmu.edu", 9999, this);
+        comms = new CommunicationsModule("nsl-n01.qatar.cmu.local", 8080, this);
         comms.setQueueLocation(commsDir);
 
         ActivityCompat.requestPermissions(this,
@@ -209,7 +210,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
         });
 //        shootB.setOnClickListener(mOnClickListener);
-        fab.setOnClickListener(new FolderClickListener(this));
+        FolderClickListener fcl = new FolderClickListener(this);
+        fab.setOnClickListener(fcl);
         settingsFab.setOnClickListener(new View.OnClickListener(){
             @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
             @Override
@@ -217,7 +219,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 changeSettings(v);
             }
         });
-
+        fcl.onClick(this.getCurrentFocus());
 
 //        For benchmarking mic power consumption
 //        ==================================================================
@@ -453,19 +455,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         mChosenFile = mFileList[which];
                         roomTV.setText("Room: "+ mChosenFile);
                         updateFolderData();
-                        selectedFolder = new File(file.getPath(),mChosenFile);
-                        String[] filesToBeQed = selectedFolder.list(new FilenameFilter() {
-                            @Override
-                            public boolean accept(File file, String s) {
-                                String ext = s.substring(s.length() - 3);
-                                if (ext == "wav" ||
-                                        ext == "jpg"){
-                                    return true;
-                                }
-                                return false;
-                            }
-                        });
-                        comms.enq(filesToBeQed);
+
                     }
                 });
             builder.setNeutralButton("Create New Folder", new DialogInterface.OnClickListener() {
@@ -496,6 +486,25 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     private void updateFolderData(){
+        File selectedFolder = new File(appDirectory, mChosenFile);
+        assert (selectedFolder.exists());
+        Log.d("selected folder", selectedFolder.getAbsolutePath());
+        String[] filesToBeQed = selectedFolder.list(new FilenameFilter() {
+            @Override
+            public boolean accept(File file, String s) {
+                String ext = s.substring(s.length() - 3);
+                Log.d("ext", ext);
+                if (ext.equalsIgnoreCase("wav") ||
+                        ext.equalsIgnoreCase("jpg")){
+                    return true;
+                }
+                return false;
+            }
+        });
+        for(int i=0; i < filesToBeQed.length; i++){
+            filesToBeQed[i] = selectedFolder.getAbsolutePath() + "/" + filesToBeQed[i];
+        }
+        comms.enq(filesToBeQed);
         this.recorder.setFolder(DATA_COLLECTOR_FOLDER+"/"+mChosenFile);
         this.mCameraModule.setFolder(DATA_COLLECTOR_FOLDER+"/"+mChosenFile);
     }
